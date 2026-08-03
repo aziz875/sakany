@@ -1,0 +1,16 @@
+{
+  "name": "sakany",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @sakany/web dev",
+    "dev:web": "pnpm --filter @sakany/web dev",
+    "build": "pnpm --filter @sakany/shared build && pnpm --filter @sakany/web build",
+    "test": "pnpm --filter @sakany/web test",
+    "db:migrate": "pnpm --filter @sakany/web db:migrate",
+    "db:generate": "pnpm --filter @sakany/web db:generate",
+    "db:seed": "pnpm --filter @sakany/web db:seed"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

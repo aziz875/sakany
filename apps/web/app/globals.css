@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #12303A;
+  --ink-soft: #4A6570;
+  --door: #1F5C86;
+  --door-deep: #164560;
+  --whitewash: #FBF8F2;
+  --sand: #EFE6D0;
+  --ochre: #C97B3D;
+  --ochre-deep: #A85F27;
+  --brass: #A9822E;
+  --font-fraunces: Georgia, 'Times New Roman', serif;
+  --font-ibm-plex: 'Segoe UI', system-ui, sans-serif;
+}
+
+body {
+  @apply bg-whitewash text-ink font-sans antialiased;
+}
+
+@layer components {
+  .arch-frame {
+    @apply overflow-hidden rounded-arch-sm;
+  }
+
+  .arch-frame-lg {
+    @apply overflow-hidden rounded-arch-lg;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-ochre px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-ochre-deep;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-full border border-door bg-transparent px-6 py-3 text-sm font-medium text-door transition-colors hover:bg-door hover:text-white;
+  }
+
+  .brass-divider {
+    @apply flex items-center justify-center gap-2 py-4;
+  }
+
+  .brass-divider::before,
+  .brass-divider::after {
+    content: '';
+    @apply h-px flex-1 bg-sand;
+  }
+
+  .brass-dot {
+    @apply h-1.5 w-1.5 rounded-full bg-brass;
+  }
+}

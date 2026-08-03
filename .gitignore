@@ -1,0 +1,38 @@
+# Dependencies
+node_modules
+.pnpm-store
+.pnpm
+.turbo
+
+# Build outputs
+dist
+.next
+out
+build
+
+# Environment files — NEVER commit secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test coverage
+coverage
+
+# Editor / IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+.agents
