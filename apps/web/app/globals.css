@@ -1,3 +1,5 @@
+@import 'leaflet/dist/leaflet.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -14,10 +16,79 @@
   --brass: #A9822E;
   --font-fraunces: Georgia, 'Times New Roman', serif;
   --font-ibm-plex: 'Segoe UI', system-ui, sans-serif;
+  --motion-fast: 150ms;
+  --motion-base: 220ms;
+  --motion-slow: 320ms;
+  --motion-shimmer: 1500ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
   @apply bg-whitewash text-ink font-sans antialiased;
+  letter-spacing: -0.01em;
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(31, 92, 134, 0.08), transparent 28%),
+    radial-gradient(circle at 80% 8%, rgba(201, 123, 61, 0.08), transparent 24%),
+    linear-gradient(180deg, #fbf8f2 0%, #faf5eb 100%);
+}
+
+@layer utilities {
+  .skeleton {
+    @apply relative overflow-hidden rounded-full bg-sand;
+    background-image: linear-gradient(90deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(255, 255, 255, 0.45) 50%,
+        rgba(255, 255, 255, 0) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer var(--skeleton-duration, var(--motion-shimmer)) linear infinite;
+    animation-delay: var(--skeleton-delay, 0ms);
+  }
+
+  .page-enter {
+    animation: page-enter var(--motion-base) var(--motion-ease-out) both;
+  }
+
+  .card-enter {
+    animation: card-enter var(--motion-base) var(--motion-ease-out) both;
+    animation-delay: var(--card-delay, 0ms);
+  }
+
+  .pressable {
+    @apply transition-transform duration-150 ease-out active:scale-[0.98];
+  }
+
+  .surface-panel {
+    box-shadow:
+      0 24px 64px -40px rgba(24, 38, 44, 0.42),
+      0 8px 20px -16px rgba(30, 20, 12, 0.12);
+  }
+
+  .surface-panel-soft {
+    box-shadow:
+      0 20px 54px -42px rgba(24, 38, 44, 0.34),
+      0 6px 16px -14px rgba(30, 20, 12, 0.09);
+  }
+
+  .surface-input {
+    box-shadow:
+      inset 0 1px 2px rgba(18, 48, 58, 0.06),
+      0 12px 30px -26px rgba(18, 48, 58, 0.18);
+  }
+
+  .brand-select {
+    appearance: none;
+    background-image:
+      linear-gradient(45deg, transparent 50%, #1f5c86 50%),
+      linear-gradient(135deg, #1f5c86 50%, transparent 50%),
+      linear-gradient(to right, transparent, transparent);
+    background-position:
+      calc(100% - 1.15rem) 52%,
+      calc(100% - 0.85rem) 52%,
+      100% 0;
+    background-size: 0.35rem 0.35rem, 0.35rem 0.35rem, 2.5rem 100%;
+    background-repeat: no-repeat;
+  }
 }
 
 @layer components {
@@ -30,11 +101,15 @@ body {
   }
 
   .btn-primary {
-    @apply inline-flex items-center justify-center rounded-full bg-ochre px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-ochre-deep;
+    @apply inline-flex items-center justify-center rounded-full bg-ochre px-6 py-3 text-sm font-medium text-white transition-all hover:bg-ochre-deep active:scale-[0.98];
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease-out);
   }
 
   .btn-secondary {
-    @apply inline-flex items-center justify-center rounded-full border border-door bg-transparent px-6 py-3 text-sm font-medium text-door transition-colors hover:bg-door hover:text-white;
+    @apply inline-flex items-center justify-center rounded-full border border-door bg-transparent px-6 py-3 text-sm font-medium text-door transition-all hover:bg-door hover:text-white active:scale-[0.98];
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--motion-ease-out);
   }
 
   .brass-divider {
@@ -50,4 +125,492 @@ body {
   .brass-dot {
     @apply h-1.5 w-1.5 rounded-full bg-brass;
   }
+
+  .hero-wash {
+    background:
+      radial-gradient(circle at 18% 18%, rgba(31, 92, 134, 0.11), transparent 24%),
+      radial-gradient(circle at 82% 12%, rgba(201, 123, 61, 0.11), transparent 22%),
+      linear-gradient(180deg, rgba(239, 230, 208, 0.8), rgba(251, 248, 242, 0.95));
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton,
+  .page-enter,
+  .card-enter {
+    animation: none !important;
+  }
+}
+
+/* ── SAKANY MAP MARKER SYSTEM ────────────────────────────────── */
+@keyframes map-pulse-radar {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.95;
+  }
+  70% {
+    transform: translate(-50%, -50%) scale(1.7);
+    opacity: 0.15;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(2.2);
+    opacity: 0;
+  }
+}
+
+.leaflet-marker-icon,
+.sakany-custom-div-icon,
+.sakany-pill-div-icon {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Location Picker Marker */
+.sakany-picker-marker {
+  position: relative;
+  width: 40px;
+  height: 52px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: auto !important;
+  cursor: grab !important;
+  user-select: none;
+}
+
+.sakany-picker-marker:active,
+.sakany-picker-marker.is-dragging {
+  cursor: grabbing !important;
+}
+
+.sakany-picker-marker .marker-radar-ring {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 2px solid rgba(201, 123, 61, 0.7);
+  background: radial-gradient(circle, rgba(201, 123, 61, 0.35) 0%, transparent 70%);
+  animation: map-pulse-radar 2.2s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sakany-picker-marker .marker-ground-dot {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background-color: #C97B3D;
+  border: 1.5px solid #FFFFFF;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sakany-picker-marker .marker-helper-badge {
+  position: absolute;
+  top: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  background-color: rgba(18, 48, 58, 0.92);
+  backdrop-filter: blur(6px);
+  color: #FBF8F2;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(18, 48, 58, 0.25);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.sakany-picker-marker .marker-helper-badge .badge-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 9999px;
+  background-color: #E08A45;
+  box-shadow: 0 0 4px #E08A45;
+}
+
+.sakany-picker-marker .marker-pin-body {
+  position: relative;
+  z-index: 5;
+  width: 40px;
+  height: 52px;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: bottom center;
+}
+
+.sakany-picker-marker:hover .marker-pin-body {
+  transform: translateY(-4px) scale(1.06);
+}
+
+.sakany-picker-marker.is-dragging .marker-pin-body {
+  transform: translateY(-10px) scale(1.15);
+}
+
+/* Single Listing Pin Marker */
+.sakany-listing-marker {
+  position: relative;
+  width: 36px;
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.sakany-listing-marker .marker-radar-ring.ring-door {
+  position: absolute;
+  bottom: 0px;
+  left: 50%;
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  border: 2px solid rgba(31, 92, 134, 0.6);
+  background: radial-gradient(circle, rgba(31, 92, 134, 0.3) 0%, transparent 70%);
+  animation: map-pulse-radar 2.4s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.sakany-listing-marker .marker-ground-dot.dot-door {
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: #1F5C86;
+  border: 1.5px solid #FFFFFF;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.sakany-listing-marker .marker-pin-body {
+  position: relative;
+  z-index: 5;
+  width: 36px;
+  height: 48px;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: bottom center;
+}
+
+.sakany-listing-marker:hover .marker-pin-body,
+.sakany-listing-marker.is-hovered .marker-pin-body {
+  transform: translateY(-4px) scale(1.1);
+}
+
+/* Multi-Listing Interactive Price Pill Marker */
+.sakany-price-pill-marker {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  transform-origin: bottom center;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  user-select: none;
+}
+
+.sakany-price-pill-marker * {
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+.sakany-price-pill-marker .price-pill-content {
+  background-color: #FFFFFF;
+  color: #12303A;
+  border: 1.5px solid #D8CFC0;
+  border-radius: 9999px;
+  padding: 6px 11px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  box-shadow: 0 4px 16px -2px rgba(18, 48, 58, 0.18);
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sakany-price-pill-marker .price-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background-color: #1F5C86;
+  transition: background-color 0.2s ease;
+}
+
+.sakany-price-pill-marker .price-val {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.sakany-price-pill-marker .price-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: #4A6570;
+  transition: color 0.2s ease;
+}
+
+.sakany-price-pill-marker .price-pill-caret {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 6px solid #D8CFC0;
+  margin-top: -1px;
+  transition: border-top-color 0.2s ease, transform 0.2s ease;
+}
+
+.sakany-price-pill-marker:hover,
+.sakany-price-pill-marker.is-hovered {
+  transform: scale(1.15) translateY(-3px);
+  z-index: 9999 !important;
+}
+
+.sakany-price-pill-marker:active {
+  transform: scale(0.96);
+}
+
+.sakany-price-pill-marker:hover .price-pill-content,
+.sakany-price-pill-marker.is-hovered .price-pill-content {
+  background-color: #12303A;
+  color: #FFFFFF;
+  border-color: #12303A;
+  box-shadow: 0 10px 28px rgba(18, 48, 58, 0.38);
+}
+
+.sakany-price-pill-marker:hover .price-dot,
+.sakany-price-pill-marker.is-hovered .price-dot {
+  background-color: #C97B3D;
+}
+
+.sakany-price-pill-marker:hover .price-unit,
+.sakany-price-pill-marker.is-hovered .price-unit {
+  color: #EFE6D0;
+}
+
+.sakany-price-pill-marker:hover .price-pill-caret,
+.sakany-price-pill-marker.is-hovered .price-pill-caret {
+  border-top-color: #12303A;
+}
+
+.sakany-price-pill-marker.is-selected .price-pill-content {
+  background-color: #1F5C86 !important;
+  color: #FFFFFF !important;
+  border-color: #1F5C86 !important;
+  box-shadow: 0 10px 28px rgba(31, 92, 134, 0.45) !important;
+}
+
+.sakany-price-pill-marker.is-selected .price-pill-caret {
+  border-top-color: #1F5C86 !important;
+}
+
+.sakany-price-pill-marker.is-selected .price-dot {
+  background-color: #C97B3D !important;
+}
+
+.sakany-price-pill-marker .marker-active-ring {
+  position: absolute;
+  bottom: -4px;
+  left: 50%;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  border: 2px solid rgba(31, 92, 134, 0.8);
+  background: radial-gradient(circle, rgba(31, 92, 134, 0.4) 0%, transparent 70%);
+  animation: map-pulse-radar 2s infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Fallback Micro-Marker */
+.sakany-micro-marker {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.sakany-micro-marker .micro-pin-bubble {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background-color: #1F5C86;
+  color: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #FFFFFF;
+  box-shadow: 0 4px 14px rgba(18, 48, 58, 0.22);
+  transition: all 0.2s ease;
+}
+
+.sakany-micro-marker .marker-caret-bottom {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #1F5C86;
+  margin-top: -1px;
+}
+
+.sakany-micro-marker:hover,
+.sakany-micro-marker.is-hovered {
+  transform: scale(1.18) translateY(-3px);
+}
+
+.sakany-micro-marker:hover .micro-pin-bubble,
+.sakany-micro-marker.is-hovered .micro-pin-bubble {
+  background-color: #12303A;
+}
+
+/* Custom Leaflet Popups */
+.leaflet-popup-content-wrapper {
+  border-radius: 18px !important;
+  padding: 0 !important;
+  background: #FFFFFF !important;
+  border: 1px solid #EFE6D0 !important;
+  box-shadow: 0 16px 36px -8px rgba(18, 48, 58, 0.22) !important;
+  overflow: hidden !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-tip {
+  background: #FFFFFF !important;
+  box-shadow: none !important;
+}
+
+/* ── University & Campus Marker ── */
+.sakany-uni-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+.sakany-university-marker {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  user-select: none;
+}
+
+.sakany-university-marker .uni-marker-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0F172A;
+  color: #FFFFFF;
+  padding: 4px 10px 4px 6px;
+  border-radius: 9999px;
+  border: 1.5px solid #38BDF8;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.35);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  letter-spacing: -0.01em;
+}
+
+.sakany-university-marker .uni-marker-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #38BDF8;
+  color: #0F172A;
+  flex-shrink: 0;
+}
+
+.sakany-university-marker .uni-marker-title {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sakany-university-marker .uni-marker-caret {
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid #0F172A;
+  margin-top: -1px;
+}
+
+.sakany-university-marker:hover,
+.sakany-university-marker.is-hovered {
+  transform: scale(1.12) translateY(-3px);
+  z-index: 1000 !important;
+}
+
+.sakany-university-marker:hover .uni-marker-pill,
+.sakany-university-marker.is-hovered .uni-marker-pill {
+  background: #1E293B;
+  border-color: #7DD3FC;
+  box-shadow: 0 8px 22px rgba(56, 189, 248, 0.4);
 }

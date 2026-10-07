@@ -38,7 +38,13 @@ export default function LoginPage() {
       });
 
       login(data);
-      router.push(data.user.role === UserRole.LANDLORD ? '/landlord/listings' : '/');
+      if (data.user.role === UserRole.ADMIN) {
+        router.push('/admin');
+      } else if (data.user.role === UserRole.LANDLORD) {
+        router.push('/landlord/listings');
+      } else {
+        router.push('/');
+      }
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Connexion impossible.';
 
@@ -143,6 +149,7 @@ export default function LoginPage() {
         {/* Error message */}
         {error && (
           <div
+            role="alert"
             className={`rounded-lg p-3 text-sm ${
               errorType === 'unverified'
                 ? 'bg-amber-50 text-amber-700'

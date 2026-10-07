@@ -5,6 +5,8 @@ import { FormEvent, useEffect, useMemo, useState, useId } from 'react';
 import { Review } from '@sakany/shared';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth-context';
+import { FriendlyEmptyState } from './FriendlyEmptyState';
+import { Skeleton } from './Skeleton';
 
 interface ListingReviewsSectionProps {
   listingId: string;
@@ -34,7 +36,6 @@ export function ListingReviewsSection({
   const [application, setApplication] = useState<{ status: string } | null>(null);
   const [appLoading, setAppLoading] = useState(true);
 
-  // Stable IDs for accessibility
   const commentId = useId();
   const errorId = useId();
   const successId = useId();
@@ -44,6 +45,7 @@ export function ListingReviewsSection({
       setAppLoading(false);
       return;
     }
+
     apiFetch<{ status: string } | null>(`/listings/${listingId}/applications/me`)
       .then((data) => setApplication(data))
       .catch(() => setApplication(null))
@@ -115,15 +117,16 @@ export function ListingReviewsSection({
       <div className="mt-6 grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div role="list" aria-label="Liste des avis">
           {items.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-sand bg-white p-8 text-center text-ink-soft">
-              Aucun avis pour le moment. Tu peux être le premier à partager ton expérience.
-            </div>
+            <FriendlyEmptyState
+              title="Aucun avis pour le moment"
+              description="Tu peux être le premier à partager ton expérience et aider les autres étudiants."
+            />
           ) : (
             <div className="space-y-4">
               {items.map((review) => (
                 <article
                   key={review.id}
-                  className="rounded-xl border border-sand bg-white p-4"
+                  className="rounded-xl border border-sand bg-white p-4 shadow-sm"
                   role="listitem"
                   aria-label={`Avis de ${review.author?.fullName ?? 'Étudiant'} — note ${review.rating}/5`}
                 >
@@ -157,13 +160,10 @@ export function ListingReviewsSection({
           </p>
 
           {authLoading || appLoading ? (
-            <div
-              className="mt-4 rounded-2xl bg-sand/50 p-4 text-sm text-ink-soft"
-              role="status"
-              aria-live="polite"
-              aria-label="Chargement de l'état d'accès..."
-            >
-              Chargement...
+            <div className="mt-4 space-y-3 rounded-2xl border border-sand bg-sand/30 p-4">
+              <Skeleton className="h-4 w-32 rounded-full" />
+              <Skeleton className="h-4 w-full rounded-full" />
+              <Skeleton className="h-10 w-full rounded-xl" />
             </div>
           ) : user && isStudent ? (
             application?.status === 'ACCEPTED' ? (
@@ -178,7 +178,7 @@ export function ListingReviewsSection({
                         onClick={() => setRating(value)}
                         aria-pressed={rating === value}
                         aria-label={`${value} — ${ratingLabels[value - 1]}`}
-                        className={`rounded-xl border px-2 py-3 text-sm transition ${
+                        className={`pressable rounded-xl border px-2 py-3 text-sm transition ${
                           rating === value
                             ? 'border-door bg-amber-50 text-door'
                             : 'border-sand bg-white text-ink-soft hover:border-door/50'
@@ -208,11 +208,10 @@ export function ListingReviewsSection({
                     maxLength={500}
                     aria-describedby={error ? errorId : successMsg ? successId : undefined}
                     aria-invalid={error ? 'true' : undefined}
-                    className="mt-2 w-full rounded-2xl border border-sand bg-white px-4 py-3 text-sm text-ink outline-none focus:border-door aria-[invalid=true]:border-red-400"
+                    className="mt-2 w-full rounded-2xl border border-sand bg-white px-4 py-3 text-sm text-ink outline-none transition focus:border-door aria-[invalid=true]:border-red-400"
                   />
                 </div>
 
-                {/* Live region for form feedback */}
                 <div aria-live="polite" aria-atomic="true">
                   {error && (
                     <div
@@ -230,6 +229,7 @@ export function ListingReviewsSection({
                       role="status"
                       className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
                     >
+                      <span className="mr-2 inline-block align-middle">✓</span>
                       {successMsg}
                     </div>
                   )}
@@ -238,20 +238,20 @@ export function ListingReviewsSection({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="btn-primary w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                  className="btn-primary pressable w-full py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
                   aria-busy={loading}
                 >
                   {loading ? 'Envoi en cours...' : 'Publier mon avis'}
                 </button>
               </form>
             ) : (
-              <div className="mt-4 rounded-2xl bg-sand/50 p-4 text-sm text-ink-soft" role="status">
+              <div className="mt-4 rounded-2xl border border-sand bg-sand/40 p-4 text-sm text-ink-soft" role="status">
                 Tu dois avoir postulé et été accepté(e) par le propriétaire pour laisser un avis sur ce
                 logement.
               </div>
             )
           ) : (
-            <div className="mt-4 rounded-2xl bg-sand/50 p-4 text-sm text-ink-soft">
+            <div className="mt-4 rounded-2xl border border-sand bg-sand/40 p-4 text-sm text-ink-soft">
               {user ? (
                 <p>Cette zone est réservée aux étudiants.</p>
               ) : (

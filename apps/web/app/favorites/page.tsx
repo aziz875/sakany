@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Listing } from '@sakany/shared';
 import { ListingCard } from '@/components/ListingCard';
+import { ListingGridSkeleton } from '@/components/LoadingStates';
+import { FriendlyEmptyState } from '@/components/FriendlyEmptyState';
 import { apiFetch } from '@/lib/api';
 import { getFavoriteListingIds } from '@/lib/favorites';
 
@@ -76,25 +78,26 @@ export default function FavoritesPage() {
       </div>
 
       {loading ? (
-        <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-80 animate-pulse rounded-2xl bg-sand" />
-          ))}
+        <div className="mt-8">
+          <ListingGridSkeleton count={3} />
         </div>
       ) : listings.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-dashed border-sand bg-white p-10 text-center">
-          <p className="font-display text-2xl text-ink">Aucun favori pour le moment</p>
-          <p className="mt-2 text-ink-soft">
-            Clique sur le bouton de sauvegarde sur une annonce pour la garder ici.
-          </p>
+        <div className="mt-8">
+          <FriendlyEmptyState
+            title="Aucun favori pour le moment"
+            description="Clique sur le bouton de sauvegarde sur une annonce pour la garder ici."
+            actionLabel="Découvrir les annonces"
+            actionHref="/"
+          />
         </div>
       ) : (
         <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {listings.map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
+          {listings.map((listing, index) => (
+            <ListingCard key={listing.id} listing={listing} index={index} />
           ))}
         </div>
       )}
     </div>
   );
 }
+

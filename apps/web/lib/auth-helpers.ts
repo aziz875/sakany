@@ -4,8 +4,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import { prisma } from './prisma';
 
 const ACCESS_TOKEN_EXPIRY = '15m';
-const REFRESH_TOKEN_DAYS_REMEMBER = 30;
-const REFRESH_TOKEN_DAYS_DEFAULT = 7;
+export const REFRESH_TOKEN_DAYS_REMEMBER = 30;
+export const REFRESH_TOKEN_DAYS_DEFAULT = 7;
+export const REFRESH_TOKEN_COOKIE_NAME = 'sakany_refresh';
+
+const COOKIE_PATH = '/';
+const COOKIE_SAME_SITE = 'lax' as const;
+const COOKIE_SECURE = process.env.NODE_ENV === 'production';
 
 /**
  * Returns a validated JWT secret, or throws if the env var is missing/weak.
@@ -22,8 +27,6 @@ function getJwtSecret(): string {
   return secret;
 }
 
-const JWT_SECRET = getJwtSecret();
-
 export interface JwtPayload {
   sub: string;
   email: string;
@@ -31,15 +34,64 @@ export interface JwtPayload {
 }
 
 export function signAccessToken(payload: JwtPayload) {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  return jwt.sign(payload, getJwtSecret(), { expiresIn: ACCESS_TOKEN_EXPIRY });
 }
 
 export function verifyToken(token: string): JwtPayload {
-  return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  return jwt.verify(token, getJwtSecret()) as JwtPayload;
 }
 
 function hashString(str: string): string {
   return createHash('sha256').update(str).digest('hex');
+}
+
+export function getRefreshTokenMaxAge(rememberMe = false) {
+  return (rememberMe ? REFRESH_TOKEN_DAYS_REMEMBER : REFRESH_TOKEN_DAYS_DEFAULT) * 24 * 60 * 60;
+}
+
+export function createRefreshTokenCookie(refreshToken: string, rememberMe = false) {
+  const maxAge = getRefreshTokenMaxAge(rememberMe);
+  return `${REFRESH_TOKEN_COOKIE_NAME}=${encodeURIComponent(refreshToken)}; path=${COOKIE_PATH}; max-age=${maxAge}; samesite=${COOKIE_SAME_SITE};${COOKIE_SECURE ? ' Secure;' : ''} HttpOnly`;
+}
+
+export function clearRefreshTokenCookie() {
+  return `${REFRESH_TOKEN_COOKIE_NAME}=; path=${COOKIE_PATH}; max-age=0; samesite=${COOKIE_SAME_SITE};${COOKIE_SECURE ? ' Secure;' : ''} HttpOnly`;
+}
+
+export function getRefreshTokenFromRequest(request: Request): string | null {
+  const cookieHeader = request.headers.get('cookie');
+  if (!cookieHeader) return null;
+
+  const cookies = cookieHeader.split(';').reduce<Record<string, string>>((acc, cookie) => {
+    const [name, ...valueParts] = cookie.trim().split('=');
+    if (!name) return acc;
+    acc[name] = decodeURIComponent(valueParts.join('='));
+    return acc;
+  }, {});
+
+  return cookies[REFRESH_TOKEN_COOKIE_NAME] ?? null;
+}
+
+export function setRefreshTokenCookie(response: NextResponse, refreshToken: string, rememberMe = false) {
+  response.cookies.set(REFRESH_TOKEN_COOKIE_NAME, refreshToken, {
+    path: COOKIE_PATH,
+    maxAge: getRefreshTokenMaxAge(rememberMe),
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
+    httpOnly: true,
+  });
+  return response;
+}
+
+export function clearRefreshTokenCookieResponse(response: NextResponse) {
+  response.cookies.set(REFRESH_TOKEN_COOKIE_NAME, '', {
+    path: COOKIE_PATH,
+    maxAge: 0,
+    sameSite: COOKIE_SAME_SITE,
+    secure: COOKIE_SECURE,
+    httpOnly: true,
+  });
+  return response;
 }
 
 export async function generateRefreshToken(userId: string, rememberMe = false) {

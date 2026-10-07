@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser, success, forbidden } from '@/lib/auth-helpers';
+import { requireRole, success } from '@/lib/auth-helpers';
+import { withApiHandler } from '@/lib/api-handler';
 
 // GET /api/landlord/stats — overview metrics for the authenticated landlord
-export async function GET(request: NextRequest) {
-  const user = await getAuthUser(request);
-  if (!user || user.role !== 'LANDLORD') return forbidden();
+async function getStats(request: NextRequest) {
+  const user = await requireRole(request, 'LANDLORD');
 
   // Aggregated counts in one query instead of fetching all rows into memory (was N+1).
   const [listingAgg, reviewAgg, photoAgg, recentCount] = await Promise.all([
@@ -85,4 +85,6 @@ export async function GET(request: NextRequest) {
           : null,
     })),
   });
-}
+} 
+
+export const GET = withApiHandler(getStats as Parameters<typeof withApiHandler>[0]);

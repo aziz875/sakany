@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
+  const [devResetLink, setDevResetLink] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -16,10 +17,11 @@ export default function ForgotPasswordPage() {
     setError(null);
 
     try {
-      await apiFetch('/auth/forgot-password', {
+      const res = await apiFetch<{ message: string; devResetLink?: string }>('/auth/forgot-password', {
         method: 'POST',
         body: JSON.stringify({ email: email.toLowerCase().trim() }),
       });
+      setDevResetLink(res.devResetLink ?? null);
       setSent(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur.');
@@ -37,6 +39,19 @@ export default function ForgotPasswordPage() {
             Si un compte existe avec cette adresse, tu recevras un email avec un lien pour
             réinitialiser ton mot de passe.
           </p>
+          {devResetLink && (
+            <div className="mt-4 rounded-lg bg-amber-50 p-3 text-left">
+              <p className="text-xs font-medium text-amber-800">
+                Mode développement — aucun fournisseur d'email configuré. Lien de réinitialisation :
+              </p>
+              <a
+                href={devResetLink}
+                className="mt-1 block break-all text-sm text-door underline hover:text-door-deep"
+              >
+                {devResetLink}
+              </a>
+            </div>
+          )}
           <Link
             href="/auth/login"
             className="mt-4 inline-block text-sm font-medium text-door hover:text-door-deep"
@@ -68,7 +83,7 @@ export default function ForgotPasswordPage() {
         </div>
 
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</div>
         )}
 
         <button

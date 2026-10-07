@@ -1,11 +1,10 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, type NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { signAccessToken, generateRefreshToken, success, unauthorized, forbidden } from '@/lib/auth-helpers';
-import { hashPassword, isBcryptHash, verifyPassword } from '@/lib/password';
+import { signAccessToken, generateRefreshToken, success, unauthorized, forbidden, setRefreshTokenCookie } from '@/lib/auth-helpers';
+import { hashPassword, verifyPassword } from '@/lib/password';
 import { withApiHandler } from '@/lib/api-handler';
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { loginSchema } from '@sakany/shared';
-import type { NextResponse } from 'next/server';
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_MINUTES = 15;
@@ -51,13 +50,6 @@ async function handler(request: NextRequest): Promise<NextResponse> {
     return unauthorized('Email ou mot de passe incorrect.');
   }
 
-  if (!isBcryptHash(user.passwordHash)) {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await hashPassword(password) },
-    });
-  }
-
   if (user.failedLoginAttempts > 0 || user.lockoutUntil) {
     await prisma.user.update({
       where: { id: user.id },
@@ -68,20 +60,24 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const accessToken = signAccessToken({ sub: user.id, email: user.email, role: user.role });
   const refreshToken = await generateRefreshToken(user.id, rememberMe);
 
-  return success({
-    accessToken,
-    refreshToken,
-    user: {
-      id: user.id,
-      fullName: user.fullName,
-      email: user.email,
-      phone: user.phone,
-      role: user.role,
-      schoolVerified: user.schoolVerified,
-      isEmailVerified: user.isEmailVerified,
-      createdAt: user.createdAt.toISOString(),
+  const response = success(
+    {
+      accessToken,
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        schoolVerified: user.schoolVerified,
+        isEmailVerified: user.isEmailVerified,
+        createdAt: user.createdAt.toISOString(),
+      },
     },
-  });
+    200,
+  );
+
+  return setRefreshTokenCookie(response, refreshToken, rememberMe);
 }
 
 export const POST = withApiHandler(handler as Parameters<typeof withApiHandler>[0]);

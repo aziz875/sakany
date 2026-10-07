@@ -58,7 +58,7 @@ describe('ListingCard', () => {
 
   it('renders the room type label', () => {
     render(<ListingCard listing={baseListing} />);
-    expect(screen.getByText('Studio')).toBeInTheDocument();
+    expect(screen.getByText(/Studio ·/)).toBeInTheDocument();
   });
 
   it('renders "Meublé" badge when furnished', () => {
@@ -81,9 +81,9 @@ describe('ListingCard', () => {
     expect(screen.queryByText('Vérifié')).not.toBeInTheDocument();
   });
 
-  it('shows "Pas de photo" when there are no photos', () => {
+  it('shows fallback when there are no photos', () => {
     render(<ListingCard listing={{ ...baseListing, photos: [] }} />);
-    expect(screen.getByLabelText('Aucune photo disponible')).toBeInTheDocument();
+    expect(screen.getByLabelText(/image indisponible/i)).toBeInTheDocument();
   });
 
   it('has an accessible article label containing the title and price', () => {
@@ -97,5 +97,16 @@ describe('ListingCard', () => {
   it('renders distance to campus', () => {
     render(<ListingCard listing={baseListing} />);
     expect(screen.getByText(/0\.3 km/)).toBeInTheDocument();
+  });
+
+  it('renders distance from selected university when provided', () => {
+    const listingWithUnis = {
+      ...baseListing,
+      nearbyUniversities: [
+        { universityId: 'u1', universityName: 'ESPRIT', distanceKm: 1.2 },
+      ],
+    };
+    render(<ListingCard listing={listingWithUnis} selectedUniversity={{ id: 'u1', name: 'ESPRIT' }} />);
+    expect(screen.getByText(/1\.2 km de ESPRIT/)).toBeInTheDocument();
   });
 });

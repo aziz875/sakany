@@ -11,6 +11,7 @@ datasource db {
 enum UserRole {
   STUDENT
   LANDLORD
+  ADMIN
 }
 
 enum RoomType {
@@ -23,6 +24,20 @@ enum ApplicationStatus {
   PENDING
   ACCEPTED
   REJECTED
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+}
+
+enum NotificationType {
+  NEW_MESSAGE
+  NEW_APPLICATION
+  APPLICATION_ACCEPTED
+  APPLICATION_REJECTED
+  GENERAL
 }
 
 model User {
@@ -43,10 +58,16 @@ model User {
   createdAt               DateTime  @default(now())
   updatedAt               DateTime  @updatedAt
 
-  listings      Listing[]
-  reviews       Review[]
-  refreshTokens RefreshToken[]
-  applications  Application[]
+  listings            Listing[]
+  reviews             Review[]
+  refreshTokens       RefreshToken[]
+  applications        Application[]
+  favorites           Favorite[]
+  reports             Report[]
+  roommateProfile     RoommateProfile?
+  conversationParts   ConversationParticipant[]
+  sentMessages        Message[]                @relation("SentMessages")
+  notifications       Notification[]
 }
 
 model RefreshToken {
@@ -78,27 +99,62 @@ model Listing {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  landlord     User          @relation(fields: [landlordId], references: [id], onDelete: Cascade)
-  photos       Photo[]
-  reviews      Review[]
-  applications Application[]
+  landlord           User                @relation(fields: [landlordId], references: [id], onDelete: Cascade)
+  photos             Photo[]
+  reviews            Review[]
+  applications       Application[]
+  favorites          Favorite[]
+  reports            Report[]
+  nearbyUniversities ListingUniversity[]
 
   @@index([pricePerMonth])
   @@index([roomType])
   @@index([distanceToCampus])
   @@index([verified])
   @@index([featured])
+  @@index([featured, createdAt])
+  @@index([landlordId, featured, createdAt])
+  @@index([lat, lng])
+}
+
+model University {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  shortName String?
+  lat       Float
+  lng       Float
+  createdAt DateTime @default(now())
+
+  nearbyListings ListingUniversity[]
+
+  @@index([lat, lng])
+}
+
+model ListingUniversity {
+  id           String @id @default(cuid())
+  listingId    String
+  universityId String
+  distanceKm   Float
+
+  listing    Listing    @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, universityId])
+  @@index([universityId, distanceKm])
+  @@index([listingId])
 }
 
 model Photo {
   id        String @id @default(cuid())
   listingId String
   url       String
-  sortOrder Int    @default(0)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
 
   listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
 
   @@index([listingId])
+  @@index([listingId, createdAt])
 }
 
 model Review {
@@ -130,4 +186,124 @@ model Application {
   @@unique([studentId, listingId])
   @@index([studentId])
   @@index([listingId])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  listingId String
+  createdAt DateTime @default(now())
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listing Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, listingId])
+  @@index([userId])
+  @@index([listingId])
+}
+
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  listingId   String
+  reason      String
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  reporter User    @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  listing  Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@index([reporterId])
+  @@index([listingId])
+  @@index([status])
+}
+
+// ─── Roommate Matchmaker ────────────────────────────────────────
+
+model RoommateProfile {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  bio              String
+  budgetMin        Int
+  budgetMax        Int
+  targetCity       String
+  university       String?
+  moveInDate       DateTime?
+  sleepSchedule    String?    // "early_bird" | "night_owl" | "flexible"
+  cleanlinessLevel String?   // "very_clean" | "moderate" | "relaxed"
+  smokingPolicy    String?   // "no_smoking" | "outside_ok" | "no_preference"
+  guestsPolicy     String?   // "no_guests" | "occasional" | "anytime"
+  gender           String?   // "male" | "female" | "no_preference"
+  age              Int?
+  avatarUrl        String?
+  active           Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([targetCity])
+  @@index([budgetMin, budgetMax])
+  @@index([active, createdAt])
+}
+
+// ─── In-App Messaging ───────────────────────────────────────────
+
+model Conversation {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([updatedAt])
+}
+
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  lastReadAt     DateTime?
+  createdAt      DateTime  @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id             String   @id @default(cuid())
+  conversationId String
+  senderId       String
+  content        String
+  createdAt      DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+}
+
+// ─── Notifications ──────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType @default(GENERAL)
+  title     String
+  message   String
+  link      String?
+  read      Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }

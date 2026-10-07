@@ -52,6 +52,19 @@ export function withApiHandler(handler: ApiHandler): ApiHandler {
         return NextResponse.json({ message: 'Ressource introuvable.' }, { status: 404 });
       }
 
+      // Custom HTTP errors thrown by requireAuthUser / requireRole
+      if (
+        typeof err === 'object' &&
+        err !== null &&
+        '__httpStatus' in err
+      ) {
+        const httpErr = err as { __httpStatus: number; __httpMessage?: string };
+        return NextResponse.json(
+          { message: httpErr.__httpMessage ?? 'Erreur.' },
+          { status: httpErr.__httpStatus },
+        );
+      }
+
       // Never leak internal errors to the client
       console.error('[API Error]', err);
       return NextResponse.json(

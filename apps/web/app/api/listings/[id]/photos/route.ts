@@ -21,6 +21,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     for (const photo of photos) {
+      if (typeof photo.url !== 'string') return badRequest('URL invalide.');
+      
+      try {
+        const urlObj = new URL(photo.url);
+        const isSupabase = urlObj.hostname.endsWith('.supabase.co');
+        const isUnsplash = urlObj.hostname === 'images.unsplash.com';
+        if (!isSupabase && !isUnsplash) {
+          return badRequest('Source d\'image non autorisée.');
+        }
+      } catch {
+        return badRequest('URL malformée.');
+      }
+
       await prisma.photo.create({
         data: {
           id: randomUUID(),

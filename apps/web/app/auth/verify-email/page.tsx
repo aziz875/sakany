@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
+import { VerifyEmailSkeleton } from '@/components/LoadingStates';
 
 function VerifyEmailContent() {
   const router = useRouter();
@@ -61,7 +62,7 @@ function VerifyEmailContent() {
       {status === 'error' && (
         <div className="rounded-lg bg-red-50 p-6">
           <h1 className="font-display text-2xl font-bold text-red-800">Échec de la vérification</h1>
-          <p className="mt-3 text-sm text-red-700">{message}</p>
+          <p className="mt-3 text-sm text-red-700" role="alert">{message}</p>
           <Link
             href="/auth/login"
             className="mt-4 inline-block text-sm font-medium text-door hover:text-door-deep"
@@ -76,7 +77,7 @@ function VerifyEmailContent() {
 
 export default function VerifyEmailPage() {
   return (
-    <Suspense fallback={<div className="mx-auto max-w-md px-4 py-12 text-center text-ink-soft">Chargement…</div>}>
+    <Suspense fallback={<VerifyEmailSkeleton />}>
       <VerifyEmailContent />
     </Suspense>
   );

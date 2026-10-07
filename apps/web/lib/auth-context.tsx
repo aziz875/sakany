@@ -2,8 +2,9 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { User, UserRole, AuthResponse } from '@sakany/shared';
-import { getAuthToken, getAuthUser, saveAuthSession, clearAuthSession, getRefreshToken } from './auth';
-import { apiFetch } from './api';
+import { getAuthToken, getAuthUser, saveAuthSession, clearAuthSession, updateStoredUser } from './auth';
+import { apiFetch, refreshAuthSession } from './api';
+import { syncFavoritesToServer } from './favorites';
 
 interface AuthContextValue {
   user: User | null;
@@ -13,8 +14,10 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   logoutAllDevices: () => Promise<void>;
   refreshUser: () => void;
+  updateUser: (user: User) => void;
   isStudent: boolean;
   isLandlord: boolean;
+  isAdmin: boolean;
   isVerified: boolean;
 }
 
@@ -26,8 +29,10 @@ const AuthContext = createContext<AuthContextValue>({
   logout: async () => {},
   logoutAllDevices: async () => {},
   refreshUser: () => {},
+  updateUser: () => {},
   isStudent: false,
   isLandlord: false,
+  isAdmin: false,
   isVerified: false,
 });
 
@@ -37,31 +42,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Hydrate from localStorage on mount
-    const storedUser = getAuthUser();
-    const storedToken = getAuthToken();
-    if (storedUser && storedToken) {
-      setUser(storedUser);
-      setToken(storedToken);
+    async function initializeAuth() {
+      const storedUser = getAuthUser();
+      const storedToken = getAuthToken();
+      if (storedUser) setUser(storedUser);
+      if (storedToken) setToken(storedToken);
+
+      // Only hit /auth/refresh when a storedUser exists but no token, or on initial load to ensure token is valid.
+      // A 401 here is normal after DB resets or expired sessions.
+      if (storedUser) {
+        const refreshed = await refreshAuthSession();
+        if (refreshed) {
+          setToken(getAuthToken());
+        } else {
+          clearAuthSession();
+          setUser(null);
+          setToken(null);
+        }
+      } else if (!storedToken) {
+        clearAuthSession();
+        setUser(null);
+        setToken(null);
+      }
+
+      setLoading(false);
     }
-    setLoading(false);
+
+    initializeAuth();
   }, []);
 
   const login = useCallback((data: AuthResponse) => {
     saveAuthSession(data);
     setUser(data.user);
     setToken(data.accessToken);
+    
+    // Sync local favorites to server asynchronously
+    syncFavoritesToServer(data.accessToken);
   }, []);
 
   const logout = useCallback(async () => {
     try {
-      const refreshToken = getRefreshToken();
-      if (refreshToken) {
-        await apiFetch('/auth/logout', {
-          method: 'POST',
-          body: JSON.stringify({ refreshToken }),
-        }).catch(() => {});
-      }
+      await apiFetch('/auth/logout', {
+        method: 'POST',
+      }).catch(() => {});
     } finally {
       clearAuthSession();
       setUser(null);
@@ -93,6 +116,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateUser = useCallback((updated: User) => {
+    updateStoredUser(updated);
+    setUser(updated);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -103,8 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         logoutAllDevices,
         refreshUser,
+        updateUser,
         isStudent: user?.role === UserRole.STUDENT,
         isLandlord: user?.role === UserRole.LANDLORD,
+        isAdmin: user?.role === UserRole.ADMIN,
         isVerified: user?.schoolVerified ?? false,
       }}
     >

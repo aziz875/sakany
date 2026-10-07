@@ -60,3 +60,4 @@ export async function uploadListingPhoto(
 
   return publicUrl.publicUrl;
 }
+

@@ -1,13 +1,12 @@
-import { NextRequest } from 'next/server';
+import { NextRequest, type NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { signAccessToken, generateRefreshToken, success, conflict, badRequest } from '@/lib/auth-helpers';
+import { signAccessToken, generateRefreshToken, success, conflict, badRequest, setRefreshTokenCookie } from '@/lib/auth-helpers';
 import { hashPassword } from '@/lib/password';
 import { randomUUID, randomBytes } from 'node:crypto';
 import { withApiHandler } from '@/lib/api-handler';
-import { sendVerificationEmail } from '@/lib/email';
+import { sendVerificationEmail } from '../../../../lib/email';
 import { rateLimit, rateLimitResponse } from '@/lib/rate-limit';
 import { registerSchema } from '@sakany/shared';
-import type { NextResponse } from 'next/server';
 
 async function handler(request: NextRequest): Promise<NextResponse> {
   // Rate limit: 5 registrations / minute per IP.
@@ -53,23 +52,35 @@ async function handler(request: NextRequest): Promise<NextResponse> {
   const accessToken = signAccessToken({ sub: createdUser.id, email, role });
   const refreshToken = await generateRefreshToken(createdUser.id);
 
-  return success(
-    {
-      accessToken,
-      refreshToken,
-      user: {
-        id: createdUser.id,
-        fullName: createdUser.fullName,
-        email: createdUser.email,
-        phone: createdUser.phone,
-        role: createdUser.role,
-        schoolVerified: createdUser.schoolVerified,
-        isEmailVerified: createdUser.isEmailVerified,
-        createdAt: createdUser.createdAt.toISOString(),
-      },
+  const response: Record<string, unknown> = {
+    accessToken,
+    user: {
+      id: createdUser.id,
+      fullName: createdUser.fullName,
+      email: createdUser.email,
+      phone: createdUser.phone,
+      role: createdUser.role,
+      schoolVerified: createdUser.schoolVerified,
+      isEmailVerified: createdUser.isEmailVerified,
+      createdAt: createdUser.createdAt.toISOString(),
     },
-    201,
-  );
+  };
+
+  // In development (no email provider configured), return the verification link directly
+  // so the flow works without setting up Resend. In production this is never returned.
+  const isDev = process.env.NODE_ENV !== 'production';
+  const hasEmailProvider = !!process.env.RESEND_API_KEY;
+  if (isDev && !hasEmailProvider) {
+    // Derive the base URL from the actual request so the link always matches
+    // the port the user is really on (e.g. localhost:3001), not a hardcoded env.
+    const host = request.headers.get('host') ?? 'localhost:3000';
+    const protocol = request.headers.get('x-forwarded-proto') ?? 'http';
+    const baseUrl = `${protocol}://${host}`;
+    response.devVerificationLink = `${baseUrl}/auth/verify-email?token=${verificationToken}`;
+  }
+
+  const apiResponse = success(response, 201);
+  return setRefreshTokenCookie(apiResponse, refreshToken);
 }
 
 export const POST = withApiHandler(handler as Parameters<typeof withApiHandler>[0]);

@@ -7,6 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { apiFetch } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { LandlordApplications } from '@/components/LandlordApplications';
+import { DashboardSkeleton } from '@/components/LoadingStates';
+import { FriendlyEmptyState } from '@/components/FriendlyEmptyState';
 
 interface ListingStat {
   id: string;
@@ -96,11 +98,7 @@ export default function LandlordDashboardPage() {
   }, [authLoading, token, user, router]);
 
   if (authLoading || loading) {
-    return (
-      <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-        <div className="h-40 animate-pulse rounded-2xl bg-sand" />
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (!user || !token) {
@@ -136,7 +134,7 @@ export default function LandlordDashboardPage() {
       </div>
 
       {error && (
-        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">
           {error}
         </div>
       )}
@@ -250,14 +248,13 @@ export default function LandlordDashboardPage() {
       )}
 
       {!error && !stats && (
-        <div className="mt-12 rounded-2xl border border-dashed border-sand bg-white p-12 text-center">
-          <p className="font-display text-2xl text-ink">Bienvenue sur Sakany</p>
-          <p className="mt-3 text-ink-soft">
-            Commence par publier ta première annonce pour voir tes statistiques.
-          </p>
-          <Link href="/landlord/new" className="btn-primary mt-6 inline-block">
-            Publier une annonce
-          </Link>
+        <div className="mt-12">
+          <FriendlyEmptyState
+            title="Bienvenue sur Sakany"
+            description="Commence par publier ta première annonce pour voir tes statistiques."
+            actionLabel="Publier une annonce"
+            actionHref="/landlord/new"
+          />
         </div>
       )}
     </div>

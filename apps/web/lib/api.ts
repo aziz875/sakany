@@ -1,9 +1,9 @@
 import { AuthResponse } from '@sakany/shared';
-import { clearAuthSession, getAuthToken, getRefreshToken, saveAuthSession } from './auth';
+import { clearAuthSession, getAuthToken, saveAuthSession } from './auth';
 
 const API_PREFIX = '/api';
 
-function getApiBaseUrl() {
+export function getApiBaseUrl() {
   if (typeof window !== 'undefined') {
     return '';
   }
@@ -25,9 +25,12 @@ let refreshPromise: Promise<AuthResponse | null> | null = null;
 export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getAuthToken();
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>),
   };
+
+  if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
 
   if (token) {
     headers.Authorization = `Bearer ${token}`;
@@ -37,9 +40,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     ...options,
     headers,
     cache: options.cache ?? 'no-store',
+    credentials: 'same-origin',
   });
 
-  if (res.status === 401 && token) {
+  if (res.status === 401) {
     const newTokens = await attemptTokenRefresh();
     if (newTokens) {
       headers.Authorization = `Bearer ${newTokens.accessToken}`;
@@ -47,13 +51,18 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
         ...options,
         headers,
         cache: options.cache ?? 'no-store',
+        credentials: 'same-origin',
       });
     }
   }
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message ?? `Erreur API (${res.status})`);
+    let errorMessage = body.message ?? `Erreur API (${res.status})`;
+    if (body.details && Array.isArray(body.details)) {
+      errorMessage += ' : ' + body.details.map((d: any) => d.message).join(', ');
+    }
+    throw new Error(errorMessage);
   }
 
   return res.json();
@@ -64,19 +73,13 @@ async function attemptTokenRefresh(): Promise<AuthResponse | null> {
     return refreshPromise;
   }
 
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) {
-    clearAuthSession();
-    return null;
-  }
-
   isRefreshing = true;
   refreshPromise = (async () => {
     try {
       const res = await fetch(buildApiUrl('/auth/refresh'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken }),
+        credentials: 'same-origin',
       });
 
       if (!res.ok) {
@@ -97,6 +100,11 @@ async function attemptTokenRefresh(): Promise<AuthResponse | null> {
   })();
 
   return refreshPromise;
+}
+
+export async function refreshAuthSession(): Promise<boolean> {
+  const data = await attemptTokenRefresh();
+  return !!data;
 }
 
 export function authHeaders(token?: string | null): HeadersInit {

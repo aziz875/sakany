@@ -1,9 +1,11 @@
 'use client';
 
-import { ListingFilters, RoomType } from '@sakany/shared';
+import { ListingFilters } from '@sakany/shared';
 import { useRouter } from 'next/navigation';
-import { FormEvent, useCallback } from 'react';
-import { ROOM_TYPE_OPTIONS } from '@/lib/constants';
+import type { FormEvent } from 'react';
+import { useCallback } from 'react';
+import { ROOM_TYPE_OPTIONS, UNIVERSITY_SEED_DATA } from '@/lib/constants';
+import { Search, GraduationCap } from 'lucide-react';
 
 type SearchBarProps = {
   initialParams: Record<string, string | string[] | undefined>;
@@ -23,19 +25,12 @@ export function SearchBar({ initialParams }: SearchBarProps) {
       const form = new FormData(e.currentTarget);
       const next = new URLSearchParams();
 
-      const fields: (keyof ListingFilters)[] = [
-        'minPrice',
-        'maxPrice',
-        'roomType',
-        'maxDistanceKm',
-      ];
+      const fields: (keyof ListingFilters)[] = ['query', 'maxPrice', 'roomType'];
 
       for (const key of fields) {
         const val = form.get(key)?.toString();
         if (val) next.set(key, val);
       }
-      if (form.get('furnished') === 'on') next.set('furnished', 'true');
-      if (form.get('verifiedOnly') === 'on') next.set('verifiedOnly', 'true');
 
       router.push(`/?${next.toString()}`);
     },
@@ -43,39 +38,53 @@ export function SearchBar({ initialParams }: SearchBarProps) {
   );
 
   return (
-    <form
+    <form 
       onSubmit={onSubmit}
-      className="rounded-2xl border border-sand bg-white/80 p-4 shadow-sm backdrop-blur sm:p-6"
+      className="mx-auto flex max-w-[850px] items-center justify-between rounded-full border border-sand bg-white shadow-lg transition-shadow hover:shadow-xl sm:h-16"
     >
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-ink-soft">Prix min (DT/mois)</span>
-          <input
-            name="minPrice"
-            type="number"
-            defaultValue={getParam('minPrice')}
-            placeholder="200"
-            className="rounded-lg border border-sand bg-whitewash px-3 py-2"
-          />
+      <div className="flex w-full items-center divide-x divide-sand h-full">
+        
+        {/* Université */}
+        <label className="flex h-full w-1/3 flex-col justify-center rounded-l-full px-6 py-2 hover:bg-sand/30 cursor-pointer transition-colors">
+          <span className="text-xs font-bold text-ink flex items-center gap-1">
+            <GraduationCap size={14} className="text-door" />
+            Université
+          </span>
+          <select
+            name="query"
+            defaultValue={getParam('query')}
+            className="w-full cursor-pointer appearance-none bg-transparent text-sm text-ink-soft outline-none truncate font-medium"
+          >
+            <option value="">Toutes les universités</option>
+            {UNIVERSITY_SEED_DATA.map((uni) => (
+              <option key={uni.name} value={uni.shortName || uni.name}>
+                {uni.name}
+              </option>
+            ))}
+          </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-ink-soft">Prix max (DT/mois)</span>
+
+        {/* Budget Max */}
+        <label className="flex h-full w-1/3 flex-col justify-center px-6 py-2 hover:bg-sand/30 cursor-pointer transition-colors">
+          <span className="text-xs font-bold text-ink">Budget Max</span>
           <input
             name="maxPrice"
             type="number"
             defaultValue={getParam('maxPrice')}
-            placeholder="800"
-            className="rounded-lg border border-sand bg-whitewash px-3 py-2"
+            placeholder="Budget max (DT)"
+            className="w-full bg-transparent text-sm text-ink-soft outline-none placeholder:text-ink-soft/60"
           />
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-ink-soft">Type de logement</span>
+
+        {/* Type de Logement */}
+        <label className="flex h-full w-1/3 flex-col justify-center px-6 py-2 hover:bg-sand/30 cursor-pointer transition-colors">
+          <span className="text-xs font-bold text-ink">Type</span>
           <select
             name="roomType"
             defaultValue={getParam('roomType')}
-            className="rounded-lg border border-sand bg-whitewash px-3 py-2"
+            className="w-full cursor-pointer appearance-none bg-transparent text-sm text-ink-soft outline-none"
           >
-            <option value="">Tous</option>
+            <option value="">Tous les types</option>
             {ROOM_TYPE_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -83,40 +92,16 @@ export function SearchBar({ initialParams }: SearchBarProps) {
             ))}
           </select>
         </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="font-medium text-ink-soft">Distance max (km)</span>
-          <input
-            name="maxDistanceKm"
-            type="number"
-            step="0.1"
-            defaultValue={getParam('maxDistanceKm')}
-            placeholder="3"
-            className="rounded-lg border border-sand bg-whitewash px-3 py-2"
-          />
-        </label>
+
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-4">
-        <label className="flex items-center gap-2 text-sm text-ink-soft">
-          <input
-            name="furnished"
-            type="checkbox"
-            defaultChecked={getParam('furnished') === 'true'}
-            className="accent-door"
-          />
-          Meublé uniquement
-        </label>
-        <label className="flex items-center gap-2 text-sm text-ink-soft">
-          <input
-            name="verifiedOnly"
-            type="checkbox"
-            defaultChecked={getParam('verifiedOnly') === 'true'}
-            className="accent-door"
-          />
-          Annonces vérifiées
-        </label>
-        <button type="submit" className="btn-primary ml-auto">
-          Rechercher
+      <div className="pr-2">
+        <button
+          type="submit"
+          className="flex h-12 w-12 items-center justify-center rounded-full bg-door text-white transition-transform hover:scale-105 shadow-md shadow-door/20"
+          aria-label="Rechercher"
+        >
+          <Search size={20} strokeWidth={3} />
         </button>
       </div>
     </form>

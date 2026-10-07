@@ -32,6 +32,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [emailAvailable, setEmailAvailable] = useState<boolean | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [devVerificationLink, setDevVerificationLink] = useState<string | null>(null);
 
   const strength = passwordStrength(password);
 
@@ -124,12 +125,19 @@ export default function RegisterPage() {
     }
 
     try {
-      const data = await apiFetch<AuthResponse>('/auth/register', {
+      const data = await apiFetch<AuthResponse & { devVerificationLink?: string }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify({ fullName, email, password, phone, role }),
       });
 
       login(data);
+
+      // In dev (no email provider), show the verification link so the user can verify.
+      if (data.devVerificationLink) {
+        setDevVerificationLink(data.devVerificationLink);
+        return;
+      }
+
       router.push(data.user.role === UserRole.LANDLORD ? '/landlord/listings' : '/');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Inscription impossible.');
@@ -148,11 +156,11 @@ export default function RegisterPage() {
         </Link>
       </p>
 
-      <div className="mt-6 flex gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         <button
           type="button"
           onClick={() => setRole(UserRole.STUDENT)}
-          className={`flex-1 rounded-full px-4 py-2 text-sm font-medium transition ${
+          className={`flex-1 min-w-[120px] rounded-full px-4 py-2 text-sm font-medium transition ${
             role === UserRole.STUDENT ? 'bg-door text-white shadow-sm' : 'border border-sand text-ink-soft hover:border-door'
           }`}
         >
@@ -161,7 +169,7 @@ export default function RegisterPage() {
         <button
           type="button"
           onClick={() => setRole(UserRole.LANDLORD)}
-          className={`flex-1 rounded-full px-4 py-2 text-sm font-medium transition ${
+          className={`flex-1 min-w-[120px] rounded-full px-4 py-2 text-sm font-medium transition ${
             role === UserRole.LANDLORD ? 'bg-door text-white shadow-sm' : 'border border-sand text-ink-soft hover:border-door'
           }`}
         >
@@ -171,7 +179,7 @@ export default function RegisterPage() {
 
       {role === UserRole.STUDENT && (
         <p className="mt-3 text-sm text-ink-soft">
-          Utilise ton adresse <strong>@esprit.tn</strong> pour confirmer ton statut étudiant.
+          Cherche un logement et trouve des colocataires compatibles.
         </p>
       )}
 
@@ -189,7 +197,7 @@ export default function RegisterPage() {
             }`}
           />
           {fieldErrors.fullName && (
-            <p className="mt-1 text-xs text-red-500">{fieldErrors.fullName}</p>
+            <p className="mt-1 text-xs text-red-500" role="alert">{fieldErrors.fullName}</p>
           )}
         </div>
 
@@ -226,7 +234,7 @@ export default function RegisterPage() {
             )}
           </div>
           {fieldErrors.email && (
-            <p className="mt-1 text-xs text-red-500">{fieldErrors.email}</p>
+            <p className="mt-1 text-xs text-red-500" role="alert">{fieldErrors.email}</p>
           )}
         </div>
 
@@ -245,7 +253,7 @@ export default function RegisterPage() {
             }`}
           />
           {fieldErrors.phone && (
-            <p className="mt-1 text-xs text-red-500">{fieldErrors.phone}</p>
+            <p className="mt-1 text-xs text-red-500" role="alert">{fieldErrors.phone}</p>
           )}
         </div>
 
@@ -275,7 +283,7 @@ export default function RegisterPage() {
             </button>
           </div>
           {fieldErrors.password && (
-            <p className="mt-1 text-xs text-red-500">{fieldErrors.password}</p>
+            <p className="mt-1 text-xs text-red-500" role="alert">{fieldErrors.password}</p>
           )}
 
           {/* Strength indicator */}
@@ -298,7 +306,22 @@ export default function RegisterPage() {
 
         {/* General error */}
         {error && (
-          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600">{error}</div>
+          <div className="rounded-lg bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</div>
+        )}
+
+        {/* Dev-only verification link (no email provider configured) */}
+        {devVerificationLink && (
+          <div className="rounded-lg bg-amber-50 p-3 text-left">
+            <p className="text-xs font-medium text-amber-800">
+              Mode développement — aucun fournisseur d'email configuré. Lien de vérification :
+            </p>
+            <a
+              href={devVerificationLink}
+              className="mt-1 block break-all text-sm text-door underline hover:text-door-deep"
+            >
+              {devVerificationLink}
+            </a>
+          </div>
         )}
 
         <button

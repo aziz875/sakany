@@ -119,4 +119,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   return success({ phone: listing.landlord.phone, landlordName: listing.landlord.fullName });
 }
 
+// DELETE /api/listings/:id
+async function deleteListing(request: NextRequest, context?: unknown): Promise<NextResponse> {
+  const { id } = await (context as RouteParams)['params'];
+
+  const user = await getAuthUser(request);
+  if (!user || user.role !== 'LANDLORD') return forbidden();
+
+  const listing = await prisma.listing.findUnique({ where: { id } });
+  if (!listing) return notFound('Annonce introuvable.');
+  if (listing.landlordId !== user.id) return forbidden('Accès refusé.');
+
+  await prisma.listing.delete({ where: { id } });
+
+  return success({ message: 'Annonce supprimée avec succès.' });
+}
+
 export const PATCH = withApiHandler(updateListing as Parameters<typeof withApiHandler>[0]);
+export const DELETE = withApiHandler(deleteListing as Parameters<typeof withApiHandler>[0]);

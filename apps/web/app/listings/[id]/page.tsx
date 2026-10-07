@@ -1,136 +1,136 @@
+import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { RoomType, ROOM_TYPE_LABELS } from '@sakany/shared';
 import { FavoriteButton } from '@/components/FavoriteButton';
-import { PhoneReveal } from '@/components/PhoneReveal';
-import { VerifiedBadge } from '@/components/VerifiedBadge';
-import { BrassDivider } from '@/components/BrassDivider';
-import { PhotoGallery } from '@/components/PhotoGallery';
+import { VerifiedBadge, FeaturedBadge } from '@/components/VerifiedBadge';
+import { FeaturedPhotoCard } from '@/components/FeaturedPhotoCard';
 import { ListingCard } from '@/components/ListingCard';
-import { ListingReviewsSection } from '@/components/ListingReviewsSection';
-import { ApplicationButton } from '@/components/ApplicationButton';
-import { getListingDetail, getSimilarListings } from '@/lib/server-queries';
+import { getListingCore, getSimilarListings } from '@/lib/server-queries';
+import { Skeleton } from '@/components/Skeleton';
+import { MapDisplay } from '@/components/MapDisplay';
+import { Star, ArrowLeft } from 'lucide-react';
 
 interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-// ISR: statically generate listing pages, revalidate every 60s.
-// This makes navigation between listings instant after first visit.
 export const revalidate = 60;
 
 export default async function ListingDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  // Direct DB query — no HTTP round-trip to our own API.
-  const listing = await getListingDetail(id);
-
+  const listing = await getListingCore(id);
   if (!listing) notFound();
 
+  const similarListings = await getSimilarListings(id, listing.roomType as RoomType).catch(() => []);
   const roomLabel = ROOM_TYPE_LABELS[listing.roomType as keyof typeof ROOM_TYPE_LABELS] ?? listing.roomType;
 
-  // Fetch similar listings using the listing's actual room type.
-  const similarListings = await getSimilarListings(id, listing.roomType).catch(() => []);
+  const mapLocations = [
+    { id: listing.id, lat: listing.lat, lng: listing.lng, title: listing.title, price: `${listing.pricePerMonth} DT` },
+    ...similarListings
+      .filter((l) => l.lat && l.lng)
+      .map((l) => ({ id: l.id, lat: l.lat, lng: l.lng, title: l.title, price: `${l.pricePerMonth} DT` })),
+  ];
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
-      <Link href="/" className="text-sm text-door hover:text-door-deep">
-        ← Retour aux annonces
-      </Link>
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-72px)] overflow-hidden bg-whitewash">
 
-      <div className="mt-6 grid gap-8 lg:grid-cols-5">
-        <div className="lg:col-span-3">
-          <PhotoGallery title={listing.title} photos={listing.photos ?? []} />
+      {/* ── LEFT: scrollable ─────────────────────────── */}
+      <div className="flex-1 overflow-y-auto min-w-0">
+
+        {/* Back */}
+        <div className="px-5 pt-5">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink transition-colors">
+            <ArrowLeft size={15} /> Retour
+          </Link>
         </div>
 
-        <div className="lg:col-span-2">
-          <div className="flex flex-wrap items-start gap-2">
-            {listing.verified && <VerifiedBadge />}
-            {listing.featured && (
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800">
-                En vedette
-              </span>
-            )}
-            {listing.furnished && (
-              <span className="rounded-full bg-sand px-2.5 py-1 text-xs text-ink-soft">
-                Meublé
-              </span>
-            )}
-          </div>
-
-          <h1 className="mt-3 font-display text-3xl font-bold text-ink">{listing.title}</h1>
-          <p className="mt-1 text-ink-soft">{roomLabel}</p>
-
-          <div className="mt-4 flex flex-wrap items-end gap-4">
-            <p className="font-display text-3xl font-semibold text-ink">
-              {listing.pricePerMonth} DT
-              <span className="text-base font-normal text-ink-soft">/mois</span>
+        {/* Count header */}
+        <div className="flex items-center justify-between px-5 pt-3 pb-2">
+          <div>
+            <p className="font-semibold text-ink">
+              {similarListings.length + 1} logement{similarListings.length > 0 ? 's' : ''} dans la zone
             </p>
-            <FavoriteButton listingId={listing.id} showLabel />
+            <p className="text-xs text-ink-soft mt-0.5">Résultats autour de ce logement</p>
           </div>
-          <p className="text-ink-soft">{listing.distanceToCampus} km du campus ESPRIT</p>
+          <span className="hidden sm:block text-sm text-ink">🩷 <span className="font-medium">Prix par mois</span></span>
+        </div>
 
-          <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-sand bg-white p-4">
-              <p className="text-sm text-ink-soft">Type</p>
-              <p className="mt-1 font-medium text-ink">{roomLabel}</p>
-            </div>
-            <div className="rounded-2xl border border-sand bg-white p-4">
-              <p className="text-sm text-ink-soft">Distance</p>
-              <p className="mt-1 font-medium text-ink">{listing.distanceToCampus} km</p>
-            </div>
-            <div className="rounded-2xl border border-sand bg-white p-4">
-              <p className="text-sm text-ink-soft">Mobilier</p>
-              <p className="mt-1 font-medium text-ink">{listing.furnished ? 'Meublé' : 'Non meublé'}</p>
-            </div>
-            <div className="rounded-2xl border border-sand bg-white p-4">
-              <p className="text-sm text-ink-soft">Statut</p>
-              <p className="mt-1 font-medium text-ink">{listing.verified ? 'Vérifié' : 'Standard'}</p>
-            </div>
-          </div>
+        <div className="px-5 pb-24 space-y-5">
 
-          <BrassDivider />
+          {/* ── FEATURED CARD ── */}
+          <article className="bg-white rounded-2xl border border-sand/50 shadow-sm overflow-hidden">
+            <div className="flex flex-col sm:flex-row">
 
-          <section>
-            <h2 className="font-display text-lg font-semibold text-ink">Description</h2>
-            <p className="mt-2 leading-relaxed text-ink-soft">{listing.description}</p>
-          </section>
+              {/* Photo carousel */}
+              <div className="w-full sm:w-[220px] shrink-0">
+                <FeaturedPhotoCard title={listing.title} photos={listing.photos ?? []} href={`/listings/${listing.id}/detail`} />
+              </div>
 
-          <BrassDivider />
+              {/* Info */}
+              <div className="flex-1 p-4 relative">
+                <div className="absolute right-3 top-3">
+                  <FavoriteButton listingId={listing.id} />
+                </div>
 
-          <section className="rounded-2xl border border-sand bg-white p-5 shadow-sm">
-            <h2 className="font-display text-lg font-semibold text-ink">Contacter le propriétaire</h2>
-            <p className="mt-1 text-sm text-ink-soft">{listing.landlord?.fullName ?? 'Propriétaire'}</p>
-            <div className="mt-4">
-              <PhoneReveal listingId={listing.id} />
+                <div className="flex flex-wrap gap-1.5 mb-1.5">
+                  {listing.featured && <FeaturedBadge />}
+                  {listing.verified && <VerifiedBadge />}
+                </div>
+
+                {/* Clickable title → full detail page */}
+                <Link
+                  href={`/listings/${listing.id}/detail`}
+                  className="group block pr-8"
+                >
+                  <p className="text-xs text-ink-soft font-medium">{roomLabel}</p>
+                  <h2 className="font-semibold text-ink text-base leading-snug mt-0.5 group-hover:underline line-clamp-2">
+                    {listing.title}
+                  </h2>
+                  <p className="mt-1 text-sm text-ink-soft line-clamp-2 leading-relaxed">
+                    {listing.description}
+                  </p>
+                  <p className="mt-1.5 text-xs text-ink-soft">
+                    {listing.distanceToCampus} km du campus le plus proche · {listing.furnished ? 'Meublé' : 'Non meublé'}
+                  </p>
+
+                  <div className="mt-3 flex items-end justify-between">
+                    <p className="text-ink">
+                      <span className="font-bold text-lg">{listing.pricePerMonth} DT</span>
+                      <span className="text-xs text-ink-soft font-normal"> / mois</span>
+                    </p>
+                    <div className="flex items-center gap-1">
+                      <Star size={12} className="fill-ink text-ink" />
+                      <span className="text-xs font-medium text-ink">Nouveau</span>
+                    </div>
+                  </div>
+                </Link>
+              </div>
             </div>
-            <ApplicationButton listingId={listing.id} />
-          </section>
+          </article>
+
+          {/* ── SIMILAR LISTINGS: 2-col grid ── */}
+          {similarListings.length > 0 && (
+            <section>
+              <p className="font-semibold text-ink text-sm mb-1">Annonces similaires</p>
+              <p className="text-xs text-ink-soft mb-4">D&apos;autres logements du même type</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-7">
+                {similarListings.map((item, i) => (
+                  <ListingCard key={item.id} listing={item} index={i} />
+                ))}
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
-      <ListingReviewsSection
-        listingId={listing.id}
-        reviews={listing.reviews}
-        averageRating={listing.averageRating}
-      />
-
-      {similarListings.length > 0 && (
-        <section className="mt-16">
-          <BrassDivider />
-          <h2 className="mt-8 font-display text-2xl font-semibold text-ink">
-            Annonces similaires
-          </h2>
-          <p className="mt-1 text-ink-soft">
-            D'autres logements du même type à proximité
-          </p>
-          <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {similarListings.map((item) => (
-              <ListingCard key={item.id} listing={item} />
-            ))}
-          </div>
-        </section>
-      )}
+      {/* ── RIGHT: sticky map ─────────────────────────── */}
+      <div className="hidden lg:flex w-[50%] shrink-0 h-full items-center justify-center p-6 bg-sand/10 border-l border-sand">
+        <div className="w-full max-w-[650px] aspect-square rounded-3xl overflow-hidden shadow-[0_8px_30px_rgba(0,0,0,0.12)] border border-sand">
+          <MapDisplay locations={mapLocations} hoveredLocationId={listing.id} />
+        </div>
+      </div>
     </div>
   );
 }

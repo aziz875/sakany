@@ -1,11 +1,12 @@
 import { NextRequest } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { getAuthUser, success, forbidden, notFound } from '@/lib/auth-helpers';
+import { getAuthUser, requireRole, success, forbidden, notFound } from '@/lib/auth-helpers';
+import { getListings } from '@/lib/server-queries';
 import { withApiHandler } from '@/lib/api-handler';
 import { createListingSchema } from '@sakany/shared';
 import type { NextResponse } from 'next/server';
 
-const ESPRIT_CAMPUS = { lat: 36.8981, lng: 10.1872 };
+const MAX_UNIVERSITY_DISTANCE_KM = 15;
 
 function haversineDistanceKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const toRad = (deg: number) => (deg * Math.PI) / 180;
@@ -17,76 +18,85 @@ function haversineDistanceKm(lat1: number, lng1: number, lat2: number, lng2: num
   return 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// GET /api/listings — search listings
+// GET /api/listings — search listings with optional viewport bounds + university filter
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const minPrice = searchParams.get('minPrice');
-  const maxPrice = searchParams.get('maxPrice');
-  const roomType = searchParams.get('roomType');
-  const furnished = searchParams.get('furnished');
-  const verifiedOnly = searchParams.get('verifiedOnly');
-  const maxDistanceKm = searchParams.get('maxDistanceKm');
+  
+  const minPrice = searchParams.get('minPrice') ?? undefined;
+  const maxPrice = searchParams.get('maxPrice') ?? undefined;
+  const roomType = searchParams.get('roomType') ?? undefined;
+  const furnished = searchParams.get('furnished') ?? undefined;
+  const verifiedOnly = searchParams.get('verifiedOnly') ?? undefined;
+  const maxDistanceKm = searchParams.get('maxDistanceKm') ?? undefined;
+  const query = searchParams.get('query') ?? undefined;
+
+  // Viewport bounds
+  const north = searchParams.get('north') ?? undefined;
+  const south = searchParams.get('south') ?? undefined;
+  const east = searchParams.get('east') ?? undefined;
+  const west = searchParams.get('west') ?? undefined;
+
+  // University filter
+  const universityId = searchParams.get('universityId') ?? undefined;
+  
   const mine = searchParams.get('mine');
+  const view = searchParams.get('view');
+  const ownerView = mine === 'true' || view === 'owner';
+  const user = ownerView ? await getAuthUser(request) : null;
+  if (ownerView && !user) return forbidden();
 
-  const where: Record<string, unknown> = {};
+  const pageParam = searchParams.get('page');
+  const pageSizeParam = searchParams.get('pageSize');
+  const page = pageParam ? parseInt(pageParam, 10) : 1;
+  const pageSize = Math.min(pageSizeParam ? parseInt(pageSizeParam, 10) : 20, 50);
 
-  if (mine === 'true') {
-    const user = await getAuthUser(request);
-    if (!user) return forbidden();
-    where.landlordId = user.id;
-  }
-
-  if (minPrice) where.pricePerMonth = { ...(where.pricePerMonth as object), gte: parseInt(minPrice) };
-  if (maxPrice) where.pricePerMonth = { ...(where.pricePerMonth as object), lte: parseInt(maxPrice) };
-  if (roomType) where.roomType = roomType;
-  if (furnished === 'true') where.furnished = true;
-  if (furnished === 'false') where.furnished = false;
-  if (verifiedOnly === 'true') where.verified = true;
-  if (maxDistanceKm) where.distanceToCampus = { lte: parseFloat(maxDistanceKm) };
-
-  const listings = await prisma.listing.findMany({
-    where,
-    orderBy: [{ featured: 'desc' }, { createdAt: 'desc' }],
-    include: {
-      landlord: { select: { id: true, fullName: true } },
-      photos: { orderBy: { sortOrder: 'asc' } },
-      _count: { select: { reviews: true } },
-    },
+  const result = await getListings({
+    minPrice,
+    maxPrice,
+    roomType,
+    furnished,
+    verifiedOnly,
+    maxDistanceKm,
+    query,
+    north,
+    south,
+    east,
+    west,
+    universityId,
+    landlordId: ownerView && user ? user.id : undefined,
+    page: isNaN(page) ? 1 : page,
+    pageSize: isNaN(pageSize) ? 20 : pageSize,
   });
-
-  const enriched = listings.map((listing) => ({
-    id: listing.id,
-    landlordId: listing.landlordId,
-    title: listing.title,
-    description: listing.description,
-    lat: listing.lat,
-    lng: listing.lng,
-    distanceToCampus: listing.distanceToCampus,
-    pricePerMonth: listing.pricePerMonth,
-    roomType: listing.roomType,
-    furnished: listing.furnished,
-    verified: listing.verified,
-    featured: listing.featured,
-    createdAt: listing.createdAt.toISOString(),
-    photos: listing.photos,
-    landlord: listing.landlord,
-    reviewCount: listing._count.reviews,
-  }));
-
-  return success(enriched);
+  
+  return success(result);
 }
 
-// POST /api/listings — create listing
+// POST /api/listings — create listing, compute distances to all nearby universities
 async function createListing(request: NextRequest): Promise<NextResponse> {
-  const user = await getAuthUser(request);
-  if (!user) return forbidden('Seuls les propriétaires peuvent publier une annonce.');
-  if (user.role !== 'LANDLORD') return forbidden('Seuls les propriétaires peuvent publier une annonce.');
+  const user = await requireRole(request, 'LANDLORD');
 
   const body = await request.json();
   const parsed = createListingSchema.parse(body);
 
   const { title, description, lat, lng, pricePerMonth, roomType, furnished } = parsed;
-  const distance = Math.round(haversineDistanceKm(lat, lng, ESPRIT_CAMPUS.lat, ESPRIT_CAMPUS.lng) * 10) / 10;
+
+  // Get all universities to compute distances
+  const universities = await prisma.university.findMany({
+    select: { id: true, lat: true, lng: true },
+  });
+
+  // Compute distances and keep only those within MAX_UNIVERSITY_DISTANCE_KM
+  const nearbyUniversities = universities
+    .map((uni) => ({
+      universityId: uni.id,
+      distanceKm: Math.round(haversineDistanceKm(lat, lng, uni.lat, uni.lng) * 10) / 10,
+    }))
+    .filter((nu) => nu.distanceKm <= MAX_UNIVERSITY_DISTANCE_KM);
+
+  // Use closest university distance as distanceToCampus (backward compat)
+  const closestDistance = nearbyUniversities.length > 0
+    ? Math.min(...nearbyUniversities.map((nu) => nu.distanceKm))
+    : Math.round(haversineDistanceKm(lat, lng, 36.8981, 10.1872) * 10) / 10; // fallback to ESPRIT
 
   const listing = await prisma.listing.create({
     data: {
@@ -95,15 +105,23 @@ async function createListing(request: NextRequest): Promise<NextResponse> {
       description,
       lat,
       lng,
-      distanceToCampus: distance,
+      distanceToCampus: closestDistance,
       pricePerMonth,
       roomType,
       furnished: furnished ?? false,
+      nearbyUniversities: {
+        create: nearbyUniversities,
+      },
     },
     include: {
       landlord: { select: { id: true, fullName: true } },
       photos: { orderBy: { sortOrder: 'asc' } },
       _count: { select: { reviews: true } },
+      nearbyUniversities: {
+        orderBy: { distanceKm: 'asc' },
+        include: { university: { select: { id: true, name: true, shortName: true } } },
+        take: 3,
+      },
     },
   });
 
@@ -124,6 +142,11 @@ async function createListing(request: NextRequest): Promise<NextResponse> {
     photos: listing.photos,
     landlord: listing.landlord,
     reviewCount: listing._count.reviews,
+    nearbyUniversities: listing.nearbyUniversities.map((nu) => ({
+      universityId: nu.universityId,
+      universityName: nu.university?.shortName || nu.university?.name || '',
+      distanceKm: nu.distanceKm,
+    })),
   }, 201);
 }
 
